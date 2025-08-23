@@ -134,3 +134,94 @@ __pycache__/
 *.tar
 *.tar.gz
 *.zip
+
+# === AJSender ignore block ===
+# OS
+.DS_Store
+Thumbs.db
+Icon?
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Desktop.ini
+
+# Editors
+.vscode/
+.idea/
+.history/
+*.code-workspace
+
+# Node… JS toolchains
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-debug.log*
+.turbo/
+.parcel-cache/
+.eslintcache
+.stylelintcache
+*.tsbuildinfo
+
+# Build outputs… caches
+dist/
+build/
+coverage/
+.vite/
+.next/
+.nuxt/
+.svelte-kit/
+.cache/
+.tmp/
+tmp/
+temp/
+
+# Env and secrets
+.env
+.env.*
+!.env.example
+
+# Logs… runtime
+*.log
+logs/
+pids/
+*.pid
+*.pid.lock
+
+# Docker… local data
+.docker/
+docker-data/
+volumes/
+data/
+db/
+*.sqlite
+*.sqlite3
+
+# Puppeteer… Chromium… WhatsApp sessions
+.puppeteer/
+.local-chromium/
+chrome-data/
+session/
+sessions/
+whatsapp-server/session/
+whatsapp-server/logs/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.coverage
+
+# Misc archives… editor droppings
+*.bak
+*.tmp
+*.swp
+*.swo
+*.tgz
+*.tar
+*.tar.gz
+*.zip
