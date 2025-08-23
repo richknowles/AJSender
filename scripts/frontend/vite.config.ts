@@ -18,6 +18,19 @@ export default defineConfig({
     outDir: 'dist',
     assetsDir: 'assets',
     sourcemap: false,
-    minify: 'esbuild'
+    minify: 'terser',
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom'],
+          animations: ['framer-motion'],
+          ui: ['lucide-react', 'react-hot-toast']
+        }
+      }
+    }
+  },
+  preview: {
+    host: '0.0.0.0',
+    port: 4173
   }
 })

@@ -2,6 +2,7 @@
   "dependencies": {
     "@types/react": "^19.1.10",
     "@types/react-dom": "^19.1.7",
+    "lint": "^0.8.19",
     "lucide-react": "^0.541.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1"

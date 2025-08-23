@@ -18,14 +18,24 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Serve static assets
+app.use('/assets', express.static(path.join(__dirname, '../frontend/public/assets')));
+
 // File upload configuration
 const upload = multer({ dest: '/tmp/uploads/' });
 
 // Database and state
 let db = null;
 let dbInitialized = false;
+let campaignProgress = {
+  isActive: false,
+  percentage: 0,
+  currentCampaign: null,
+  totalContacts: 0,
+  sentCount: 0
+};
 
-// WhatsApp state (simulated)
+// WhatsApp state
 let whatsappStatus = {
   connected: false,
   qrCode: null,
@@ -34,71 +44,61 @@ let whatsappStatus = {
 
 // Initialize SQLite database
 function initializeDatabase() {
-  return new Promise((resolve, reject) => {
-    try {
-      const dataDir = path.join(__dirname, 'data');
-      if (!fs.existsSync(dataDir)) {
-        fs.mkdirSync(dataDir, { recursive: true });
-        console.log('Created data directory');
-      }
-      
-      const dbPath = path.join(dataDir, 'ajsender.sqlite');
-      console.log('Initializing database at:', dbPath);
-      
-      db = new sqlite3.Database(dbPath, (err) => {
-        if (err) {
-          console.error('Database connection error:', err);
-          reject(err);
-          return;
-        }
-        console.log('Connected to SQLite database');
-        
-        // Create tables
-        db.serialize(() => {
-          db.run(`CREATE TABLE IF NOT EXISTS contacts (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            phone_number TEXT UNIQUE NOT NULL,
-            name TEXT,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-          )`, (err) => {
-            if (err) console.error('Error creating contacts table:', err);
-          });
-
-          db.run(`CREATE TABLE IF NOT EXISTS campaigns (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            message TEXT NOT NULL,
-            status TEXT DEFAULT 'draft',
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-          )`, (err) => {
-            if (err) console.error('Error creating campaigns table:', err);
-          });
-
-          db.run(`CREATE TABLE IF NOT EXISTS campaign_messages (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            campaign_id INTEGER,
-            contact_id INTEGER,
-            phone_number TEXT NOT NULL,
-            message TEXT NOT NULL,
-            status TEXT DEFAULT 'pending',
-            sent_at DATETIME,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-          )`, (err) => {
-            if (err) console.error('Error creating campaign_messages table:', err);
-            else {
-              dbInitialized = true;
-              console.log('Database tables initialized successfully');
-              resolve();
-            }
-          });
-        });
-      });
-    } catch (error) {
-      console.error('Database initialization error:', error);
-      reject(error);
+  try {
+    const dataDir = path.join(__dirname, 'data');
+    if (!fs.existsSync(dataDir)) {
+      fs.mkdirSync(dataDir, { recursive: true });
     }
-  });
+    
+    const dbPath = path.join(dataDir, 'ajsender.sqlite');
+    console.log('Initializing database at:', dbPath);
+    
+    db = new sqlite3.Database(dbPath, (err) => {
+      if (err) {
+        console.error('Database connection error:', err);
+        return;
+      }
+      console.log('✅ Connected to SQLite database');
+      
+      // Create tables
+      db.serialize(() => {
+        db.run(`CREATE TABLE IF NOT EXISTS contacts (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          phone_number TEXT UNIQUE NOT NULL,
+          name TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )`);
+
+        db.run(`CREATE TABLE IF NOT EXISTS campaigns (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          message TEXT NOT NULL,
+          status TEXT DEFAULT 'draft',
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )`);
+
+        db.run(`CREATE TABLE IF NOT EXISTS campaign_messages (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          campaign_id INTEGER,
+          contact_id INTEGER,
+          phone_number TEXT NOT NULL,
+          message TEXT NOT NULL,
+          status TEXT DEFAULT 'pending',
+          sent_at DATETIME,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )`);
+
+        dbInitialized = true;
+        console.log('✅ Database tables initialized');
+      });
+    });
+  } catch (error) {
+    console.error('Database initialization error:', error);
+  }
 }
+
+// Initialize database on startup
+initializeDatabase();
 
 // Health check
 app.get('/health', (req, res) => {
@@ -119,6 +119,11 @@ app.get('/api/status', (req, res) => {
     authenticated: whatsappStatus.connected,
     database: dbInitialized ? 'connected' : 'connecting'
   });
+});
+
+// Campaign progress endpoint
+app.get('/api/campaigns/progress', (req, res) => {
+  res.json(campaignProgress);
 });
 
 // Metrics endpoint
@@ -209,10 +214,6 @@ app.post('/api/contacts/upload', upload.single('csvFile'), (req, res) => {
     return res.status(400).json({ error: 'No file uploaded' });
   }
 
-  if (!db || !dbInitialized) {
-    return res.status(503).json({ error: 'Database not ready' });
-  }
-
   const contacts = [];
   const errors = [];
   let processedCount = 0;
@@ -244,6 +245,10 @@ app.post('/api/contacts/upload', upload.single('csvFile'), (req, res) => {
           error: 'No valid contacts found in CSV',
           errors 
         });
+      }
+
+      if (!db || !dbInitialized) {
+        return res.status(503).json({ error: 'Database not ready' });
       }
 
       let insertedCount = 0;
@@ -294,7 +299,16 @@ app.get('/api/campaigns', (req, res) => {
     return res.json([]);
   }
   
-  db.all('SELECT * FROM campaigns ORDER BY created_at DESC', (err, rows) => {
+  db.all(`
+    SELECT c.*, 
+           COUNT(cm.id) as total_messages,
+           COUNT(CASE WHEN cm.status = 'sent' THEN 1 END) as sent_count,
+           COUNT(CASE WHEN cm.status = 'delivered' THEN 1 END) as delivered_count
+    FROM campaigns c
+    LEFT JOIN campaign_messages cm ON c.id = cm.campaign_id
+    GROUP BY c.id
+    ORDER BY c.created_at DESC
+  `, (err, rows) => {
     if (err) {
       console.error('Error fetching campaigns:', err);
       return res.json([]);
@@ -332,12 +346,12 @@ app.post('/api/campaigns', (req, res) => {
   );
 });
 
-// Send campaign endpoint
+// Send campaign endpoint with progress tracking
 app.post('/api/campaigns/:id/send', async (req, res) => {
   const campaignId = req.params.id;
 
   if (!whatsappStatus.connected) {
-    return res.status(400).json({ error: 'WhatsApp not connected. Please authenticate WhatsApp first.' });
+    return res.status(400).json({ error: 'WhatsApp not connected' });
   }
 
   if (!db || !dbInitialized) {
@@ -368,24 +382,62 @@ app.post('/api/campaigns/:id/send', async (req, res) => {
       return res.status(400).json({ error: 'No contacts available' });
     }
 
-    // Update campaign status
-    db.run('UPDATE campaigns SET status = ? WHERE id = ?', ['completed', campaignId]);
+    // Initialize progress
+    campaignProgress = {
+      isActive: true,
+      percentage: 0,
+      currentCampaign: campaign.name,
+      totalContacts: contacts.length,
+      sentCount: 0
+    };
 
-    // Simulate sending messages
-    console.log(`Simulating campaign "${campaign.name}" to ${contacts.length} contacts...`);
+    // Update campaign status
+    db.run('UPDATE campaigns SET status = ? WHERE id = ?', ['sending', campaignId]);
+
+    console.log(`Starting campaign "${campaign.name}" to ${contacts.length} contacts...`);
     
+    // Simulate sending with progress updates
     let sentCount = 0;
-    for (let contact of contacts) {
-      // Record message as sent
+    
+    for (let i = 0; i < contacts.length; i++) {
+      const contact = contacts[i];
+      
+      // Simulate delay
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      // Record message
       db.run(`
         INSERT INTO campaign_messages 
         (campaign_id, contact_id, phone_number, message, status, sent_at) 
         VALUES (?, ?, ?, ?, ?, ?)
       `, [campaignId, contact.id, contact.phone_number, campaign.message, 'sent', new Date().toISOString()]);
+
       sentCount++;
+      
+      // Update progress
+      campaignProgress.sentCount = sentCount;
+      campaignProgress.percentage = Math.round((sentCount / contacts.length) * 100);
+      
+      console.log(`Progress: ${campaignProgress.percentage}% (${sentCount}/${contacts.length})`);
     }
 
-    console.log(`Campaign completed! ${sentCount} messages recorded.`);
+    // Complete campaign
+    campaignProgress.isActive = false;
+    campaignProgress.percentage = 100;
+    db.run('UPDATE campaigns SET status = ? WHERE id = ?', ['completed', campaignId]);
+
+    console.log(`Campaign completed! ${sentCount} messages sent.`);
+
+    // Reset progress after 5 seconds
+    setTimeout(() => {
+      campaignProgress = {
+        isActive: false,
+        percentage: 0,
+        currentCampaign: null,
+        totalContacts: 0,
+        sentCount: 0
+      };
+    }, 5000);
 
     res.json({
       success: true,
@@ -396,6 +448,7 @@ app.post('/api/campaigns/:id/send', async (req, res) => {
 
   } catch (error) {
     console.error('Campaign send error:', error);
+    campaignProgress.isActive = false;
     db.run('UPDATE campaigns SET status = ? WHERE id = ?', ['failed', campaignId]);
     res.status(500).json({ error: error.message });
   }
@@ -407,26 +460,35 @@ app.get('/api/whatsapp/qr', (req, res) => {
     return res.json({ authenticated: true, qrCode: null });
   }
   
-  // Generate a demo QR code
-  const sampleData = `https://wa.me/qr/demo-${Date.now()}`;
-  QRCode.toDataURL(sampleData)
-    .then(qrDataUrl => {
-      whatsappStatus.qrCode = qrDataUrl;
-      res.json({
-        authenticated: false,
-        qrCode: qrDataUrl,
-        status: 'qr_ready',
-        message: 'Scan QR code to connect (Demo mode - click Authenticate button instead)'
+  // Generate a sample QR for demo
+  if (!whatsappStatus.qrCode) {
+    const sampleData = `https://wa.me/qr/demo-${Date.now()}`;
+    QRCode.toDataURL(sampleData)
+      .then(qrDataUrl => {
+        whatsappStatus.qrCode = qrDataUrl;
+        res.json({
+          authenticated: false,
+          qrCode: qrDataUrl,
+          status: 'qr_ready',
+          message: 'Scan QR code to connect'
+        });
+      })
+      .catch(err => {
+        res.json({
+          authenticated: false,
+          qrCode: null,
+          status: 'error',
+          message: 'Failed to generate QR code'
+        });
       });
-    })
-    .catch(err => {
-      res.json({
-        authenticated: false,
-        qrCode: null,
-        status: 'error',
-        message: 'Failed to generate QR code'
-      });
+  } else {
+    res.json({
+      authenticated: false,
+      qrCode: whatsappStatus.qrCode,
+      status: 'qr_ready',
+      message: 'Scan QR code to connect'
     });
+  }
 });
 
 app.post('/api/whatsapp/authenticate', (req, res) => {
@@ -444,23 +506,25 @@ app.post('/api/whatsapp/logout', (req, res) => {
   res.json({ success: true, message: 'WhatsApp disconnected' });
 });
 
-// Start server and initialize database
-const startServer = async () => {
-  try {
-    await initializeDatabase();
-    console.log('Database initialized successfully');
-    
-    app.listen(PORT, '0.0.0.0', () => {
-      console.log(`AJ Sender Backend running on port ${PORT}`);
-      console.log(`Health check: http://localhost:${PORT}/health`);
-    });
-  } catch (error) {
-    console.error('Failed to start server:', error);
-    process.exit(1);
-  }
-};
+app.post('/api/whatsapp/restart', (req, res) => {
+  whatsappStatus.connected = false;
+  whatsappStatus.qrCode = null;
+  console.log('WhatsApp client restarting...');
+  res.json({ success: true, message: 'WhatsApp client restarting' });
+});
 
-startServer();
+// Error handling middleware
+app.use((error, req, res, next) => {
+  console.error('Server error:', error);
+  res.status(500).json({ error: 'Internal server error' });
+});
+
+// Start server
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 AJ Sender Backend running on port ${PORT}`);
+  console.log(`📊 Health check: http://localhost:${PORT}/health`);
+  console.log(`📱 WhatsApp QR: http://localhost:${PORT}/api/whatsapp/qr`);
+});
 
 // Graceful shutdown
 process.on('SIGINT', () => {
