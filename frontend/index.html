@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="AJ Sender - Professional WhatsApp Bulk Messaging Platform" />
+    <meta name="author" content="AJ Ricardo" />
+    <title>AJ Sender - WhatsApp Bulk Messaging</title>
+    
+    <!-- Preload critical fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    
+    <!-- Meta tags for PWA -->
+    <meta name="theme-color" content="#22c55e" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="AJ Sender" />
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://sender.ajricardo.com/" />
+    <meta property="og:title" content="AJ Sender - WhatsApp Bulk Messaging" />
+    <meta property="og:description" content="Professional WhatsApp bulk messaging platform for marketing campaigns" />
+    
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image" />
+    <meta property="twitter:url" content="https://sender.ajricardo.com/" />
+    <meta property="twitter:title" content="AJ Sender - WhatsApp Bulk Messaging" />
+    <meta property="twitter:description" content="Professional WhatsApp bulk messaging platform for marketing campaigns" />
+    
+    <style>
+      /* Critical CSS for loading state */
+      body {
+        margin: 0;
+        padding: 0;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+      }
+      
+      #loading {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        transition: opacity 0.5s ease-out;
+      }
+      
+      .loading-content {
+        text-align: center;
+        color: white;
+      }
+      
+      .loading-spinner {
+        width: 50px;
+        height: 50px;
+        border: 3px solid rgba(255, 255, 255, 0.3);
+        border-top: 3px solid white;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 20px;
+      }
+      
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+      
+      .loading-text {
+        font-size: 18px;
+        font-weight: 600;
+        margin-bottom: 8px;
+      }
+      
+      .loading-subtitle {
+        font-size: 14px;
+        opacity: 0.8;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Loading screen -->
+    <div id="loading">
+      <div class="loading-content">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">AJ Sender</div>
+        <div class="loading-subtitle">Loading your messaging platform...</div>
+      </div>
+    </div>
+    
+    <div id="root"></div>
+    
+    <script>
+      // Hide loading screen when React app loads
+      window.addEventListener('load', function() {
+        setTimeout(function() {
+          const loading = document.getElementById('loading');
+          if (loading) {
+            loading.style.opacity = '0';
+            setTimeout(() => loading.remove(), 500);
+          }
+        }, 1000);
+      });
+    </script>
+    
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

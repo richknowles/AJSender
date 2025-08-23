@@ -1,0 +1,76 @@
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: ajsender-frontend
+    networks:
+      - ajsender-network
+    environment:
+      - VITE_API_URL=http://backend:3001
+      - VITE_WS_URL=ws://whatsapp-server:3002
+    depends_on:
+      - backend
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ajsender-backend
+    ports:
+      - "3001:3001"
+    networks:
+      - ajsender-network
+    volumes:
+      - ./data:/app/data
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - WHATSAPP_SERVER_URL=http://whatsapp-server:3002
+      - JWT_SECRET=${JWT_SECRET:-your-super-secret-jwt-key}
+    depends_on:
+      - whatsapp-server
+
+  whatsapp-server:
+    build:
+      context: ./whatsapp-server
+      dockerfile: Dockerfile
+    container_name: ajsender-whatsapp
+    ports:
+      - "3002:3002"
+    networks:
+      - ajsender-network
+    volumes:
+      - ./data/whatsapp-session:/app/session
+    environment:
+      - NODE_ENV=production
+      - PORT=3002
+      - SESSION_PATH=/app/session
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: ajsender-caddy
+    ports:
+      - "80:80"
+      - "443:443"
+    networks:
+      - ajsender-network
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    environment:
+      - DOMAIN=${DOMAIN:-sender.ajricardo.com}
+    depends_on:
+      - frontend
+      - backend
+    restart: unless-stopped
+
+volumes:
+  caddy_data:
+  caddy_config:
+
+networks:
+  ajsender-network:
+    driver: bridge

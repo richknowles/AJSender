@@ -1,0 +1,66 @@
+
+{
+  "name": "messages",
+  "options": {
+    "validator": {
+      "$jsonSchema": {
+        "bsonType": "object",
+        "required": ["messageId", "phoneNumber", "content", "status", "createdAt"],
+        "properties": {
+          "messageId": {
+            "bsonType": "string",
+            "description": "Unique message identifier"
+          },
+          "phoneNumber": {
+            "bsonType": "string",
+            "description": "Recipient phone number"
+          },
+          "content": {
+            "bsonType": "string",
+            "description": "Message content"
+          },
+          "status": {
+            "bsonType": "string",
+            "enum": ["pending", "sending", "sent", "failed", "delivered"],
+            "description": "Message delivery status"
+          },
+          "batchId": {
+            "bsonType": "string",
+            "description": "Batch identifier for bulk messages"
+          },
+          "errorMessage": {
+            "bsonType": "string",
+            "description": "Error details if failed"
+          },
+          "sentAt": {
+            "bsonType": "string",
+            "title": "datetime",
+            "description": "ISO 8601 datetime when message was sent"
+          },
+          "deliveredAt": {
+            "bsonType": "string", 
+            "title": "datetime",
+            "description": "ISO 8601 datetime when message was delivered"
+          },
+          "creator": {
+            "bsonType": "string",
+            "description": "Creator of the message"
+          },
+          "createdAt": {
+            "bsonType": "string",
+            "title": "datetime",
+            "description": "ISO 8601 datetime string (UTC): YYYY-MM-DDTHH:mm:ss.sssZ"
+          },
+          "updatedAt": {
+            "bsonType": "string",
+            "title": "datetime", 
+            "description": "ISO 8601 datetime string (UTC): YYYY-MM-DDTHH:mm:ss.sssZ"
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "validationLevel": "moderate",
+    "validationAction": "warn"
+  }
+}

@@ -1,0 +1,73 @@
+
+{
+  "name": "batches",
+  "options": {
+    "validator": {
+      "$jsonSchema": {
+        "bsonType": "object",
+        "required": ["batchId", "name", "totalMessages", "status", "createdAt"],
+        "properties": {
+          "batchId": {
+            "bsonType": "string",
+            "description": "Unique batch identifier"
+          },
+          "name": {
+            "bsonType": "string",
+            "description": "Batch name/description"
+          },
+          "totalMessages": {
+            "bsonType": "int",
+            "minimum": 0,
+            "description": "Total number of messages in batch"
+          },
+          "sentMessages": {
+            "bsonType": "int",
+            "minimum": 0,
+            "description": "Number of messages sent"
+          },
+          "failedMessages": {
+            "bsonType": "int",
+            "minimum": 0,
+            "description": "Number of failed messages"
+          },
+          "status": {
+            "bsonType": "string",
+            "enum": ["pending", "processing", "completed", "failed"],
+            "description": "Batch processing status"
+          },
+          "messageContent": {
+            "bsonType": "string",
+            "description": "Message template content"
+          },
+          "startedAt": {
+            "bsonType": "string",
+            "title": "datetime",
+            "description": "When batch processing started"
+          },
+          "completedAt": {
+            "bsonType": "string",
+            "title": "datetime", 
+            "description": "When batch processing completed"
+          },
+          "creator": {
+            "bsonType": "string",
+            "description": "Creator of the batch"
+          },
+          "createdAt": {
+            "bsonType": "string",
+            "title": "datetime",
+            "description": "ISO 8601 datetime string (UTC): YYYY-MM-DDTHH:mm:ss.sssZ"
+          },
+          "updatedAt": {
+            "bsonType": "string",
+            "title": "datetime",
+            "description": "ISO 8601 datetime string (UTC): YYYY-MM-DDTHH:mm:ss.sssZ"
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "validationLevel": "moderate",
+    "validationAction": "warn"
+  }
+}

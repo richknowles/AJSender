@@ -1,0 +1,75 @@
+services:
+  # Frontend service
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:80"
+    environment:
+      - NODE_ENV=production
+    depends_on:
+      - backend
+    networks:
+      - ajsender-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Backend service
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - WHATSAPP_SESSION_PATH=/app/whatsapp-session
+      - DATABASE_URL=sqlite:///app/data/database.sqlite
+    volumes:
+      - ./whatsapp-session:/app/whatsapp-session
+      - ./data:/app/data
+      - ./uploads:/app/uploads
+    networks:
+      - ajsender-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) }).on('error', () => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Caddy reverse proxy
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - ajsender-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    depends_on:
+      - frontend
+      - backend
+
+volumes:
+  caddy_data:
+    external: false
+  caddy_config:
+    external: false
+
+networks:
+  ajsender-network:
+    driver: bridge
+    name: ajsender-network
