@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# AJ Sender Deployment Verification Script
+# Verifies that the deployment is working correctly
+
 set -e
 
 print_status() {
@@ -14,8 +17,13 @@ print_error() {
     echo -e "\033[0;31m[ERROR]\033[0m $1"
 }
 
+print_warning() {
+    echo -e "\033[1;33m[WARNING]\033[0m $1"
+}
+
+# Test functions
 test_backend_health() {
-    print_status "Testing backend health..."
+    print_status "Testing backend health endpoint..."
     
     local max_attempts=30
     local attempt=1
@@ -31,7 +39,7 @@ test_backend_health() {
         ((attempt++))
     done
     
-    print_error "Backend health check failed"
+    print_error "Backend health check failed after $max_attempts attempts"
     return 1
 }
 
@@ -50,6 +58,7 @@ test_frontend_access() {
 test_api_endpoints() {
     print_status "Testing API endpoints..."
     
+    # Test status endpoint
     if curl -sf http://localhost:3001/api/status > /dev/null 2>&1; then
         print_success "Status endpoint: OK"
     else
@@ -57,6 +66,7 @@ test_api_endpoints() {
         return 1
     fi
     
+    # Test metrics endpoint
     if curl -sf http://localhost:3001/api/metrics > /dev/null 2>&1; then
         print_success "Metrics endpoint: OK"
     else
@@ -64,9 +74,81 @@ test_api_endpoints() {
         return 1
     fi
     
+    # Test contacts endpoint
+    if curl -sf http://localhost:3001/api/contacts > /dev/null 2>&1; then
+        print_success "Contacts endpoint: OK"
+    else
+        print_error "Contacts endpoint: Failed"
+        return 1
+    fi
+    
     return 0
 }
 
+test_database_connection() {
+    print_status "Testing database connection..."
+    
+    # Check if database file exists and is readable
+    if docker-compose exec -T backend test -f /app/data/ajsender.sqlite; then
+        print_success "Database file exists"
+    else
+        print_warning "Database file not found (will be created on first use)"
+    fi
+    
+    # Test database via API
+    local response=$(curl -s http://localhost:3001/api/metrics 2>/dev/null || echo "failed")
+    if [ "$response" != "failed" ] && echo "$response" | grep -q "totalContacts"; then
+        print_success "Database connection: OK"
+        return 0
+    else
+        print_error "Database connection: Failed"
+        return 1
+    fi
+}
+
+test_file_permissions() {
+    print_status "Testing file permissions..."
+    
+    # Check data directory permissions
+    if docker-compose exec -T backend test -w /app/data; then
+        print_success "Data directory: Writable"
+    else
+        print_error "Data directory: Not writable"
+        return 1
+    fi
+    
+    # Check session directory permissions
+    if docker-compose exec -T backend test -w /app/whatsapp-session; then
+        print_success "Session directory: Writable"
+    else
+        print_error "Session directory: Not writable"
+        return 1
+    fi
+    
+    return 0
+}
+
+test_container_logs() {
+    print_status "Checking container logs for errors..."
+    
+    # Check backend logs
+    local backend_errors=$(docker-compose logs backend 2>&1 | grep -i error | wc -l)
+    if [ "$backend_errors" -eq 0 ]; then
+        print_success "Backend logs: No errors"
+    else
+        print_warning "Backend logs: $backend_errors error(s) found"
+    fi
+    
+    # Check frontend logs
+    local frontend_errors=$(docker-compose logs frontend 2>&1 | grep -i error | wc -l)
+    if [ "$frontend_errors" -eq 0 ]; then
+        print_success "Frontend logs: No errors"
+    else
+        print_warning "Frontend logs: $frontend_errors error(s) found"
+    fi
+}
+
+# Main verification function
 main() {
     echo "============================================="
     echo "🔍 AJ Sender Deployment Verification"
@@ -75,9 +157,11 @@ main() {
     
     local overall_status=0
     
+    # Wait for containers to be ready
     print_status "Waiting for containers to start..."
     sleep 10
     
+    # Run tests
     test_backend_health || overall_status=1
     echo
     
@@ -87,6 +171,16 @@ main() {
     test_api_endpoints || overall_status=1
     echo
     
+    test_database_connection || overall_status=1
+    echo
+    
+    test_file_permissions || overall_status=1
+    echo
+    
+    test_container_logs
+    echo
+    
+    # Final result
     if [ $overall_status -eq 0 ]; then
         print_success "✅ All verification tests passed!"
         print_success "🚀 AJ Sender is ready to use!"
@@ -97,7 +191,7 @@ main() {
         print_status "• Health Check: http://localhost:3001/health"
     else
         print_error "❌ Some verification tests failed!"
-        print_error "Please check the logs and fix any issues."
+        print_error "Please check the logs and fix any issues before proceeding."
         echo
         print_status "Debug commands:"
         print_status "• Check logs: docker-compose logs"
@@ -110,4 +204,5 @@ main() {
     return $overall_status
 }
 
+# Run verification
 main "$@"

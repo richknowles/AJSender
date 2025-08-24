@@ -1,0 +1,41 @@
+{
+    email admin@alisium.run
+}
+
+# Production configuration
+sender.ajricardo.com {
+    encode zstd gzip
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Frame-Options "SAMEORIGIN"
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        -Server
+    }
+    route {
+        handle_path /api/* {
+            reverse_proxy backend:3001
+        }
+        handle_path /auth/* {
+            reverse_proxy backend:3001
+        }
+        handle /health {
+            reverse_proxy backend:3001
+        }
+        handle {
+            reverse_proxy frontend:80
+        }
+    }
+}
+
+code.dev.alisium.run {
+    encode zstd gzip
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Frame-Options "SAMEORIGIN"
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        -Server
+    }
+    reverse_proxy http://host.docker.internal:8081
+}

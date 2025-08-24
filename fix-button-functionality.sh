@@ -1,3 +1,14 @@
+#!/bin/bash
+# Fix button functionality - ensure all API endpoints work
+set -euo pipefail
+
+echo "=== Fixing Button Functionality ==="
+
+# Stop containers
+docker-compose down
+
+# Update backend server.js with proper file upload handling
+cat > backend/server.js << 'EOF'
 const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
@@ -589,3 +600,23 @@ process.on('SIGINT', () => {
     }
     process.exit(0);
 });
+EOF
+
+echo "✅ Backend functionality updated!"
+echo ""
+echo "Building and starting containers..."
+docker-compose up --build -d
+
+echo ""
+echo "🎉 All buttons should now work!"
+echo ""
+echo "Features now working:"
+echo "- CSV upload with proper file handling"
+echo "- Campaign creation with validation"
+echo "- Campaign sending simulation (95% success rate)"
+echo "- Analytics modal with real data"
+echo "- Progress tracking during campaign sends"
+echo ""
+echo "Frontend: http://localhost:3000"
+echo "Backend: http://localhost:3001"
+echo "Test the upload with a CSV file containing columns: phone_number, name, email"

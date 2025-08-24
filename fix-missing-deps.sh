@@ -1,3 +1,45 @@
+#!/bin/bash
+# Fix missing dependencies and simplify App.tsx
+set -euo pipefail
+
+echo "=== Fixing Missing Dependencies ==="
+
+# Stop containers
+docker-compose down
+
+# Create a simplified App.tsx without the missing dependencies
+cat > frontend/src/App.tsx << 'EOF'
+import React from 'react'
+import Dashboard from './components/Dashboard'
+import './index.css'
+
+function App() {
+  return (
+    <div className="App">
+      <Dashboard />
+    </div>
+  )
+}
+
+export default App
+EOF
+
+# Create main.tsx
+cat > frontend/src/main.tsx << 'EOF'
+import React from 'react'
+import ReactDOM from 'react-dom/client'
+import App from './App.tsx'
+import './index.css'
+
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>,
+)
+EOF
+
+# Create a working Dashboard.tsx without framer-motion and react-hot-toast
+cat > frontend/src/components/Dashboard.tsx << 'EOF'
 import React, { useState, useEffect } from 'react'
 import { Users, MessageSquare, Send, BarChart3, Plus, TrendingUp, Upload, CheckCircle, XCircle, Clock, RefreshCw, Heart, Wifi, Moon, Sun, X } from 'lucide-react'
 
@@ -581,3 +623,42 @@ const Dashboard: React.FC = () => {
 }
 
 export default Dashboard
+EOF
+
+# Create index.css with Tailwind
+cat > frontend/src/index.css << 'EOF'
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.App {
+  min-height: 100vh;
+}
+EOF
+
+echo "✅ Dependencies fixed!"
+echo ""
+echo "Building and starting containers..."
+docker-compose up --build -d
+
+echo ""
+echo "🎉 Should work now!"
+echo "Frontend: http://localhost:3000"
+echo "Backend: http://localhost:3001"

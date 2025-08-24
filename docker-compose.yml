@@ -7,6 +7,8 @@ services:
       dockerfile: Dockerfile
     ports:
       - "3000:80"
+    environment:
+      - NODE_ENV=production
     depends_on:
       - backend
     networks:
@@ -22,6 +24,7 @@ services:
       - NODE_ENV=production
       - PORT=3001
       - WHATSAPP_AUTH_URL=http://whatsapp-server:3002
+      - DATABASE_URL=sqlite:///app/data/database.sqlite
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
@@ -48,18 +51,24 @@ services:
       - ajsender-network
     restart: unless-stopped
 
-  # Simple nginx reverse proxy
-  proxy:
-    image: nginx:alpine
+  caddy:
+    image: caddy:2-alpine
     ports:
       - "80:80"
+      - "443:443"
     volumes:
-      - ./nginx-proxy.conf:/etc/nginx/nginx.conf:ro
-    depends_on:
-      - frontend
-      - backend
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
     networks:
       - ajsender-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+volumes:
+  caddy_data:
+  caddy_config:
 
 networks:
   ajsender-network:
