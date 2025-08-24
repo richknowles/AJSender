@@ -1,25 +1,17 @@
+version: '3.8'
+
 services:
-  # Frontend service
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
     ports:
       - "3000:80"
-    environment:
-      - NODE_ENV=production
     depends_on:
       - backend
     networks:
       - ajsender-network
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:80/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
 
-  # Backend service
   backend:
     build:
       context: ./backend
@@ -29,47 +21,46 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3001
-      - WHATSAPP_SESSION_PATH=/app/whatsapp-session
-      - DATABASE_URL=sqlite:///app/data/database.sqlite
+      - WHATSAPP_AUTH_URL=http://whatsapp-server:3002
     volumes:
-      - ./whatsapp-session:/app/whatsapp-session
       - ./data:/app/data
-      - ./uploads:/app/uploads
+      - ./logs:/app/logs
+    depends_on:
+      - whatsapp-server
     networks:
       - ajsender-network
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) }).on('error', () => process.exit(1))"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
 
-  # Caddy reverse proxy
-  caddy:
-    image: caddy:2-alpine
+  whatsapp-server:
+    build:
+      context: ./whatsapp-server
+      dockerfile: Dockerfile
+    ports:
+      - "3002:3002"
+    environment:
+      - NODE_ENV=production
+      - PORT=3002
+    volumes:
+      - ./whatsapp-sessions:/app/.wwebjs_auth
+      - ./whatsapp-cache:/app/.wwebjs_cache
+      - ./whatsapp-public:/app/public
+    networks:
+      - ajsender-network
+    restart: unless-stopped
+
+  # Simple nginx reverse proxy
+  proxy:
+    image: nginx:alpine
     ports:
       - "80:80"
-      - "443:443"
     volumes:
-      - ./caddy/Caddyfile:/etc/caddy/Caddyfile
-      - caddy_data:/data
-      - caddy_config:/config
-    networks:
-      - ajsender-network
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    restart: unless-stopped
+      - ./nginx-proxy.conf:/etc/nginx/nginx.conf:ro
     depends_on:
       - frontend
       - backend
-
-volumes:
-  caddy_data:
-    external: false
-  caddy_config:
-    external: false
+    networks:
+      - ajsender-network
 
 networks:
   ajsender-network:
     driver: bridge
-    name: ajsender-network

@@ -1,43 +1,26 @@
 FROM node:18-alpine
 
+# deps for Chromium driven by whatsapp-web.js/puppeteer
 RUN apk add --no-cache \
     chromium \
     nss \
     freetype \
-    freetype-dev \
     harfbuzz \
     ca-certificates \
     ttf-freefont
 
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
+
 WORKDIR /app
-
-# Copy package files and install dependencies
 COPY package*.json ./
-RUN npm install
-
-# Copy source code
+RUN npm install --omit=dev
 COPY . .
 
-# Build the TypeScript project
-RUN npm run build
-
-# Create session and logs directories with proper permissions
-RUN mkdir -p /app/session /app/logs
-
-# Create nodejs user and group
-RUN addgroup -g 1001 -S nodejs
-RUN adduser -S nodejs -u 1001
-
-# Give nodejs user ownership of the entire app directory
-RUN chown -R nodejs:nodejs /app
-
-# Set proper permissions for session directory
-RUN chmod -R 755 /app/session
-RUN chmod -R 755 /app/logs
-
-# Switch to nodejs user
-USER nodejs
+RUN mkdir -p sessions public/qr .wwebjs_auth .wwebjs_cache
+RUN addgroup -g 1001 -S nodejs && adduser -S whatsapp -u 1001
+RUN chown -R whatsapp:nodejs /app
+USER whatsapp
 
 EXPOSE 3002
-
-CMD ["npm", "start"]
+CMD ["node","server.js"]
